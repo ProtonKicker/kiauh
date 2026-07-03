@@ -36,13 +36,15 @@ from utils.sys_utils import (
     update_system_package_lists,
 )
 
+from kiauh import PROJECT_ROOT
+
 
 def get_kiauh_version() -> str:
     """
     Helper method to get the current KIAUH version by reading the latest tag
     :return: string of the latest tag or a default value if no tags exist
     """
-    tags: List[str] = get_local_tags(Path(__file__).parent.parent)
+    tags: List[str] = get_local_tags(PROJECT_ROOT)
     if tags:
         return tags[-1]
     else:

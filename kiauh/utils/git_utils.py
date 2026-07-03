@@ -67,7 +67,7 @@ def git_pull_wrapper(target_dir: Path) -> None:
     Logger.print_status("Updating repository ...")
     try:
         git_cmd_pull(target_dir)
-    except CalledProcessError:
+    except (CalledProcessError, GitException):
         log = "An unexpected error occured during updating the repository."
         Logger.print_error(log)
         return
@@ -102,6 +102,9 @@ def get_current_branch(repo: Path) -> str | None:
     :param repo: Path to the local Git repository
     :return: Current branch or None if not determinable
     """
+    if not repo.exists() or not repo.joinpath(".git").exists():
+        return None
+
     try:
         cmd = ["git", "branch", "--show-current"]
         result: str = check_output(cmd, stderr=DEVNULL, cwd=repo).decode(
@@ -120,6 +123,8 @@ def get_local_tags(repo_path: Path, _filter: str | None = None) -> List[str]:
     :param _filter: Optional filter to filter the tags by
     :return: List of tags
     """
+    if not repo_path.exists() or not repo_path.joinpath(".git").is_dir():
+        return []
 
     def parse_version(version: str) -> tuple:
         # Remove 'v' prefix if present
@@ -337,6 +342,11 @@ def git_cmd_checkout(branch: str | None, target_dir: Path) -> None:
     if branch is None:
         return
 
+    if not target_dir.exists() or not target_dir.joinpath(".git").exists():
+        log = f"'{target_dir}' is not a valid git repository."
+        Logger.print_error(log)
+        raise GitException(log)
+
     try:
         command = ["git", "checkout", f"{branch}"]
         run(command, cwd=target_dir, check=True)
@@ -349,6 +359,11 @@ def git_cmd_checkout(branch: str | None, target_dir: Path) -> None:
 
 
 def git_cmd_pull(target_dir: Path) -> None:
+    if not target_dir.exists() or not target_dir.joinpath(".git").exists():
+        log = f"'{target_dir}' is not a valid git repository."
+        Logger.print_error(log)
+        raise GitException(log)
+
     try:
         command = ["git", "pull"]
         run(command, cwd=target_dir, check=True)
@@ -359,6 +374,11 @@ def git_cmd_pull(target_dir: Path) -> None:
 
 
 def rollback_repository(repo_dir: Path, instance: Type[InstanceType]) -> None:
+    if not repo_dir.exists() or not repo_dir.joinpath(".git").exists():
+        log = f"'{repo_dir}' is not a valid git repository."
+        Logger.print_error(log)
+        raise GitException(log)
+
     q1 = "How many commits do you want to roll back"
     amount = get_number_input(q1, 1, allow_go_back=True)
 
@@ -394,7 +414,7 @@ def get_repo_url(repo_dir: Path) -> str | None:
     :param repo_dir: Path to the git repository
     :return: URL of the remote repository or None if not found
     """
-    if not repo_dir.exists():
+    if not repo_dir.exists() or not repo_dir.joinpath(".git").exists():
         return None
 
     try:
