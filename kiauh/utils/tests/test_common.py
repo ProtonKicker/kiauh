@@ -104,6 +104,28 @@ class TestCheckInstallDependencies:
 
         check_install_dependencies({"pkg"})
 
+    def test_propagates_runtime_error_from_package_list_update(
+        self, monkeypatch
+    ) -> None:
+        # Installing dependencies must propagate apt update failures rather than
+        # swallow them, because continuing with broken package metadata is unsafe.
+        monkeypatch.setattr(
+            "utils.common.check_package_install",
+            lambda *_a, **_k: ["missing-pkg"],
+        )
+
+        def _raise(*_a, **_k):
+            raise RuntimeError("apt-get update failed")
+
+        monkeypatch.setattr("utils.common.update_system_package_lists", _raise)
+        monkeypatch.setattr(
+            "utils.common.install_system_packages",
+            lambda *_a, **_k: pytest.fail("should not install on broken apt update"),
+        )
+
+        with pytest.raises(RuntimeError):
+            check_install_dependencies({"pkg"})
+
 
 class _FakeInstanceType:
     def __init__(self, suffix: str):

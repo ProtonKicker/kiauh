@@ -89,6 +89,8 @@ def check_install_dependencies(
         Logger.print_info("The following packages need installation:")
         for r in requirements:
             print(Color.apply(f"● {r}", Color.CYAN))
+        # Installing against stale or missing package metadata is unsafe, so abort
+        # here instead of swallowing the error like the update menu does.
         update_system_package_lists(silent=False)
         install_system_packages(requirements)
 

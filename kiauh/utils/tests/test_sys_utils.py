@@ -158,6 +158,25 @@ class TestCreatePythonVenv:
         assert create_python_venv(target, force=True) is True
         assert removed == [target]
 
+    def test_headless_skips_recreate_without_prompting(self, monkeypatch) -> None:
+        target = Path("/tmp/venv")
+
+        monkeypatch.setattr("utils.sys_utils.Path.exists", lambda self: self == target)
+        monkeypatch.setattr(
+            "utils.sys_utils.get_confirm",
+            lambda *a, **k: pytest.fail("should not prompt in headless mode"),
+        )
+        monkeypatch.setattr(
+            "utils.sys_utils.shutil.rmtree",
+            lambda *a, **k: pytest.fail("should not rmtree in headless mode"),
+        )
+        monkeypatch.setattr(
+            "utils.sys_utils.run",
+            lambda *a, **k: pytest.fail("should not recreate in headless mode"),
+        )
+
+        assert create_python_venv(target, interactive=False) is False
+
     def test_creation_failure(self, monkeypatch) -> None:
         monkeypatch.setattr(
             "utils.sys_utils.run",
@@ -200,14 +219,24 @@ class TestUpdatePythonPip:
         update_python_pip(Path("/tmp/venv"))
         assert runs == [["/tmp/venv/bin/pip", "install", "-U", "pip"]]
 
-    def test_logs_stderr(self, monkeypatch, capsys) -> None:
+    def test_succeeds_when_returncode_and_stderr_are_clean(self, monkeypatch) -> None:
         def fake_run(cmd: List[str], **kwargs: Any) -> Any:
-            return type("R", (), {"returncode": 0, "stderr": "some warning"})()
+            return type("R", (), {"returncode": 0, "stderr": ""})()
 
         monkeypatch.setattr("utils.sys_utils.check_file_exist", lambda *a, **k: True)
         monkeypatch.setattr("utils.sys_utils.run", fake_run)
 
         update_python_pip(Path("/tmp/venv"))
+
+    def test_failure_raises(self, monkeypatch) -> None:
+        def fake_run(cmd: List[str], **kwargs: Any) -> Any:
+            return type("R", (), {"returncode": 1, "stderr": "nope"})()
+
+        monkeypatch.setattr("utils.sys_utils.check_file_exist", lambda *a, **k: True)
+        monkeypatch.setattr("utils.sys_utils.run", fake_run)
+
+        with pytest.raises(RuntimeError, match="Updating pip failed"):
+            update_python_pip(Path("/tmp/venv"))
 
 
 class TestInstallPythonRequirements:
@@ -280,6 +309,18 @@ class TestUpdateSystemPackageLists:
         update_system_package_lists(silent=True, rls_info_change=True)
 
         assert runs == [["sudo", "apt-get", "update", "--allow-releaseinfo-change"]]
+
+    def test_failure_raises(self, monkeypatch) -> None:
+        monkeypatch.setattr("utils.sys_utils.time.time", lambda: 100_000)
+        monkeypatch.setattr("utils.sys_utils.os.path.getmtime", lambda p: 0)
+
+        def fake_run(cmd: List[str], **kwargs: Any) -> Any:
+            return type("R", (), {"returncode": 1, "stderr": "apt failed"})()
+
+        monkeypatch.setattr("utils.sys_utils.run", fake_run)
+
+        with pytest.raises(RuntimeError, match="Updating system package list failed"):
+            update_system_package_lists(silent=True)
 
 
 class TestGetUpgradablePackages:
@@ -413,9 +454,11 @@ class TestSetNginxPermissions:
     def test_no_change_when_executable(self, monkeypatch) -> None:
         monkeypatch.setattr(
             "utils.sys_utils.run",
-            lambda cmd, **kwargs: type("R", (), {"stdout": "drwxr-xr-x"})()
-            if "ls" in cmd
-            else pytest.fail("should not chmod"),
+            lambda cmd, **kwargs: (
+                type("R", (), {"stdout": "drwxr-xr-x"})()
+                if "ls" in cmd
+                else pytest.fail("should not chmod")
+            ),
         )
         set_nginx_permissions()
 

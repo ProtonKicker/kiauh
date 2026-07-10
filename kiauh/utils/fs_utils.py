@@ -12,14 +12,33 @@ from __future__ import annotations
 
 import os
 import re
-import shutil
+import subprocess
 from pathlib import Path
-from subprocess import DEVNULL, PIPE, CalledProcessError, call, check_output, run
+from subprocess import DEVNULL, PIPE, CalledProcessError
 from typing import List
 from zipfile import ZipFile
 
+from core import backends
 from core.decorators import deprecated
 from core.logger import Logger
+
+# Delegate to the shared backends module so tests can substitute
+# command_runner/filesystem from one location instead of patching module globals.
+
+
+def run(cmd: str | List[str], **kwargs) -> subprocess.CompletedProcess[str]:
+    """Run a command through the shared command runner."""
+    return backends.command_runner.run(cmd, **kwargs)
+
+
+def check_output(cmd: str | List[str], **kwargs) -> str | bytes:
+    """Run a command and return its output through the shared command runner."""
+    return backends.command_runner.check_output(cmd, **kwargs)
+
+
+def call(cmd: str | List[str], **kwargs) -> int:
+    """Run a command and return its exit code through the shared command runner."""
+    return backends.command_runner.call(cmd, **kwargs)
 
 
 def check_file_exist(file_path: Path, sudo=False) -> bool:
@@ -103,14 +122,14 @@ def remove_file(file_path: Path, sudo=False) -> None:
 
 def run_remove_routines(file: Path) -> bool:
     try:
-        if not file.is_symlink() and not file.exists():
+        if not backends.filesystem.is_symlink(file) and not backends.filesystem.exists(file):
             Logger.print_info(f"File '{file}' does not exist. Skipped ...")
             return False
 
-        if file.is_dir():
-            shutil.rmtree(file)
-        elif file.is_file() or file.is_symlink():
-            file.unlink()
+        if backends.filesystem.is_dir(file):
+            backends.filesystem.rmtree(file)
+        elif backends.filesystem.is_file(file) or backends.filesystem.is_symlink(file):
+            backends.filesystem.unlink(file)
         else:
             Logger.print_error(f"File '{file}' is neither a file nor a directory!")
             return False
@@ -127,6 +146,9 @@ def run_remove_routines(file: Path) -> bool:
             Logger.print_error(f"Error deleting '{file}' with sudo:\n{e}")
             Logger.print_error("Remove this directory manually!")
             return False
+    # Direct and sudo removal both failed without raising; return a boolean so
+    # callers get a predictable result.
+    return False
 
 
 def unzip(filepath: Path, target_dir: Path) -> None:
@@ -143,9 +165,9 @@ def unzip(filepath: Path, target_dir: Path) -> None:
 def create_folders(dirs: List[Path]) -> None:
     try:
         for _dir in dirs:
-            if _dir.exists():
+            if backends.filesystem.exists(_dir):
                 continue
-            _dir.mkdir(exist_ok=True)
+            backends.filesystem.mkdir(_dir, exist_ok=True)
             Logger.print_ok(f"Created directory '{_dir}'!")
     except OSError as e:
         Logger.print_error(f"Error creating directories: {e}")

@@ -254,7 +254,16 @@ class UpdateMenu(BaseMenu):
         self._fetch_system_package_update_status()
 
     def _fetch_system_package_update_status(self) -> None:
-        update_system_package_lists(silent=True)
+        # Treat apt update failures as non-fatal here so the menu remains usable
+        # even when package metadata is unavailable. Dependency installation still
+        # fails fast elsewhere.
+        try:
+            update_system_package_lists(silent=True)
+        except RuntimeError as exc:
+            Logger.print_warn(
+                "Could not update the system package lists; "
+                f"system package status may be incomplete. ({exc})"
+            )
         self.packages = get_upgradable_packages()
         self.package_count = len(self.packages)
 

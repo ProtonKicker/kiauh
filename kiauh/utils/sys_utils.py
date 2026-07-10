@@ -13,14 +13,16 @@ import re
 import select
 import shutil
 import socket
+import subprocess
 import sys
 import time
 import urllib.error
 import urllib.request
 from pathlib import Path
-from subprocess import DEVNULL, PIPE, CalledProcessError, Popen, check_output, run
+from subprocess import DEVNULL, PIPE, CalledProcessError, Popen
 from typing import List, Literal, Set, Tuple
 
+from core import backends
 from core.constants import SYSTEMD
 from core.logger import Logger
 from utils.fs_utils import check_file_exist, remove_with_sudo
@@ -37,6 +39,29 @@ SysCtlServiceAction = Literal[
     "unmask",
 ]
 SysCtlManageAction = Literal["daemon-reload", "reset-failed"]
+
+# Delegate to the shared backends module so tests can substitute command_runner
+# from one location instead of patching module globals.
+
+
+def run(cmd: str | List[str], **kwargs) -> subprocess.CompletedProcess[str]:
+    """Run a command through the shared command runner."""
+    return backends.command_runner.run(cmd, **kwargs)
+
+
+def check_output(cmd: str | List[str], **kwargs) -> str | bytes:
+    """Run a command and return its output through the shared command runner."""
+    return backends.command_runner.check_output(cmd, **kwargs)
+
+
+def call(cmd: str | List[str], **kwargs) -> int:
+    """Run a command and return its exit code through the shared command runner."""
+    return backends.command_runner.call(cmd, **kwargs)
+
+
+def popen(cmd: str | List[str], **kwargs) -> Popen:
+    """Start a process through the shared command runner."""
+    return backends.command_runner.popen(cmd, **kwargs)
 
 
 class VenvCreationFailedException(Exception):
@@ -95,7 +120,8 @@ def create_python_venv(
     target: Path,
     force: bool = False,
     allow_access_to_system_site_packages: bool = False,
-    use_python_binary: str | None = None
+    use_python_binary: str | None = None,
+    interactive: bool = True,
 ) -> bool:
     """
     Create a python 3 virtualenv at the provided target destination.
@@ -105,6 +131,9 @@ def create_python_venv(
     :param force: Force recreation of the virtualenv
     :param allow_access_to_system_site_packages: give the virtual environment access to the system site-packages dir
     :param use_python_binary: allows to override default python binary
+    :param interactive: When False (headless), an existing venv is left untouched
+        instead of prompting for confirmation: a non-interactive run must never
+        destroy a working venv, and must never block on ``read``.
     :return: bool
     """
     Logger.print_status("Set up Python virtual environment ...")
@@ -116,7 +145,7 @@ def create_python_venv(
     ) if allow_access_to_system_site_packages else None
 
     n = 2
-    while(n > 0):
+    while n > 0:
         if not target.exists():
             try:
                 run(cmd, check=True)
@@ -131,11 +160,20 @@ def create_python_venv(
                 # but the function should still behave correctly
                 Logger.print_error("Virtualenv still exists after deletion.")
                 return False
-            if not force and not get_confirm(
-                "Virtualenv already exists. Re-create?", default_choice=False
-            ):
-                Logger.print_info("Skipping re-creation of virtualenv ...")
-                return False
+            if not force:
+                if not interactive:
+                    # Headless mode must never destroy an existing venv or block
+                    # on input; skip it so requirements are only installed into
+                    # freshly created environments.
+                    Logger.print_info(
+                        "Virtualenv already exists; skipping re-creation ..."
+                    )
+                    return False
+                if not get_confirm(
+                    "Virtualenv already exists. Re-create?", default_choice=False
+                ):
+                    Logger.print_info("Skipping re-creation of virtualenv ...")
+                    return False
 
             try:
                 shutil.rmtree(target)
@@ -165,7 +203,7 @@ def update_python_pip(target: Path) -> None:
         if result.returncode != 0 or result.stderr:
             Logger.print_error(f"{result.stderr}", False)
             Logger.print_error("Updating pip failed!")
-            return
+            raise RuntimeError("Updating pip failed!")
 
         Logger.print_ok("Updating pip successful!")
     except FileNotFoundError as e:
@@ -268,7 +306,7 @@ def update_system_package_lists(silent: bool, rls_info_change=False) -> None:
         if result.returncode != 0 or result.stderr:
             Logger.print_error(f"{result.stderr}", False)
             Logger.print_error("Updating system package list failed!")
-            return
+            raise RuntimeError("Updating system package list failed!")
 
         Logger.print_ok("System package list update successful!")
     except CalledProcessError as e:
