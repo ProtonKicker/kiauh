@@ -1,6 +1,8 @@
 .idea
 .vscode
 .pytest_cache
+.ruff_cache
+.mypy_cache
 .jupyter
 *.ipynb
 *.ipynb_checkpoints
@@ -10,5 +12,7 @@ __pycache__
 .venv
 *.code-workspace
 *.iml
+*.egg-info
+.coverage
 kiauh.cfg
 klipper_repos.txt
