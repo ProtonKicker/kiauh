@@ -27,9 +27,7 @@ from components.klipper.klipper_dialogs import (
     print_select_instance_count_dialog,
 )
 from components.webui_client.base_data import BaseWebClient
-from components.webui_client.client_config.client_config_setup import (
-    create_client_config_symlink,
-)
+from components.webui_client.client_utils import create_client_config_symlink
 from core.constants import CURRENT_USER
 from core.instance_manager.base_instance import SUFFIX_BLACKLIST
 from core.logger import DialogType, Logger
@@ -88,33 +86,45 @@ def assign_custom_name(key: int, name_dict: Dict[int, str]) -> None:
     name_dict[key] = get_string_input(question, exclude=existing_names, regex=pattern)
 
 
-def check_user_groups() -> None:
+def check_user_groups(interactive: bool = True) -> None:
+    """Ensure the current user is in the ``tty`` and ``dialout`` groups.
+
+    When ``interactive`` is true (the TUI path), the user is shown a dialog and
+    must confirm before groups are modified. When ``interactive`` is false (the
+    headless CLI path), groups are added automatically without prompting.
+    """
     user_groups = [grp.getgrgid(gid).gr_name for gid in os.getgroups()]
     missing_groups = [g for g in ["tty", "dialout"] if g not in user_groups]
 
     if not missing_groups:
         return
 
-    Logger.print_dialog(
-        DialogType.ATTENTION,
-        [
-            "Your current user is not in group:",
-            *[f"● {g}" for g in missing_groups],
-            "\n\n",
-            "It is possible that you won't be able to successfully connect and/or "
-            "flash the controller board without your user being a member of that "
-            "group. If you want to add the current user to the group(s) listed above, "
-            "answer with 'Y'. Else skip with 'n'.",
-            "\n\n",
-            "INFO:",
-            "Relog required for group assignments to take effect!",
-        ],
-    )
+    if interactive:
+        Logger.print_dialog(
+            DialogType.ATTENTION,
+            [
+                "Your current user is not in group:",
+                *[f"● {g}" for g in missing_groups],
+                "\n\n",
+                "It is possible that you won't be able to successfully connect and/or "
+                "flash the controller board without your user being a member of that "
+                "group. If you want to add the current user to the group(s) listed above, "
+                "answer with 'Y'. Else skip with 'n'.",
+                "\n\n",
+                "INFO:",
+                "Relog required for group assignments to take effect!",
+            ],
+        )
 
-    if not get_confirm(f"Add user '{CURRENT_USER}' to group(s) now?"):
-        log = "Skipped adding user to required groups. You might encounter issues."
-        Logger.print_warn(log)
-        return
+        if not get_confirm(f"Add user '{CURRENT_USER}' to group(s) now?"):
+            log = "Skipped adding user to required groups. You might encounter issues."
+            Logger.print_warn(log)
+            return
+    else:
+        Logger.print_info(
+            f"Adding user '{CURRENT_USER}' to required groups: "
+            f"{', '.join(missing_groups)}"
+        )
 
     try:
         for group in missing_groups:
@@ -126,8 +136,9 @@ def check_user_groups() -> None:
         Logger.print_error(f"Unable to add user to usergroups: {e}")
         raise
 
-    log = "Remember to relog/restart this machine for the group(s) to be applied!"
-    Logger.print_warn(log)
+    if interactive:
+        log = "Remember to relog/restart this machine for the group(s) to be applied!"
+        Logger.print_warn(log)
 
 
 def handle_disruptive_system_packages() -> None:

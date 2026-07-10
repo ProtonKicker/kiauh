@@ -8,6 +8,7 @@
 # ======================================================================= #
 from __future__ import annotations
 
+import traceback
 from copy import copy
 from typing import Dict, List, Tuple
 
@@ -94,132 +95,234 @@ class KlipperSetupService:
 
         self.msgsvc = MessageService()
 
-    def __refresh_state(self) -> None:
+    def _refresh_state(self) -> None:
         self.kisvc.load_instances()
         self.klipper_list = self.kisvc.get_all_instances()
 
         self.misvc.load_instances()
         self.moonraker_list = self.misvc.get_all_instances()
 
-    def install(self) -> None:
-        self.__refresh_state()
+    def install(
+        self,
+        count: int | None = None,
+        custom_names: Dict[int, str] | None = None,
+        create_example_cfg: bool | None = None,
+        match_moonraker: bool = False,
+        interactive: bool = True,
+    ) -> bool:
+        """Install Klipper.
+
+        When called without arguments from the TUI, all choices are prompted
+        interactively. The CLI passes explicit values and ``interactive=False``.
+
+        Returns ``True`` on success and ``False`` when installation cannot proceed.
+        """
+        self._refresh_state()
 
         Logger.print_status("Installing Klipper ...")
 
-        match_moonraker: bool = False
+        name_dict: Dict[int, str] = {}
 
-        # if there are more moonraker instances than klipper instances, ask the user to
-        # match the klipper instance count to the count of moonraker instances with the same suffix
-        if len(self.moonraker_list) > len(self.klipper_list):
-            is_confirmed = self.__display_moonraker_info()
-            if not is_confirmed:
+        if custom_names is not None:
+            name_dict = custom_names
+        elif match_moonraker and len(self.moonraker_list) > len(self.klipper_list):
+            if interactive:
+                if not self._display_moonraker_info():
+                    Logger.print_status(EXIT_KLIPPER_SETUP)
+                    return True
+            name_dict = {
+                i: moonraker.suffix for i, moonraker in enumerate(self.moonraker_list)
+            }
+        elif count is not None:
+            name_dict = {i: "" for i in range(count)}
+        elif interactive:
+            install_count, name_dict = self.__get_install_count_and_name_dict()
+
+            if install_count == 0:
                 Logger.print_status(EXIT_KLIPPER_SETUP)
-                return
-            match_moonraker = True
+                return True
 
-        install_count, name_dict = self.__get_install_count_and_name_dict()
+            is_multi_install = install_count > 1 or (
+                len(name_dict) >= 1 and install_count >= 1
+            )
+            if not name_dict and install_count == 1:
+                name_dict = {0: ""}
+            elif is_multi_install and not self.__count_from_moonraker_match(
+                install_count, name_dict
+            ):
+                use_custom_names = self.__use_custom_names_or_go_back()
+                if use_custom_names is None:
+                    Logger.print_status(EXIT_KLIPPER_SETUP)
+                    return True
 
-        if install_count == 0:
-            Logger.print_status(EXIT_KLIPPER_SETUP)
-            return
-
-        is_multi_install = install_count > 1 or (
-            len(name_dict) >= 1 and install_count >= 1
-        )
-        if not name_dict and install_count == 1:
+                self.__handle_instance_names(install_count, name_dict, use_custom_names)
+        else:
             name_dict = {0: ""}
-        elif is_multi_install and not match_moonraker:
-            custom_names = self.__use_custom_names_or_go_back()
-            if custom_names is None:
-                Logger.print_status(EXIT_KLIPPER_SETUP)
-                return
 
-            self.__handle_instance_names(install_count, name_dict, custom_names)
+        if not name_dict:
+            Logger.print_status(EXIT_KLIPPER_SETUP)
+            return True
 
-        create_example_cfg = get_confirm("Create example printer.cfg?")
-        # run the actual installation
+        if create_example_cfg is None:
+            create_example_cfg = (
+                get_confirm("Create example printer.cfg?") if interactive else False
+            )
+
         try:
-            self.__run_setup(name_dict, create_example_cfg)
-        except Exception as e:
-            Logger.print_error(e)
+            self.__run_setup(name_dict, create_example_cfg, interactive=interactive)
+        except Exception:
+            Logger.print_error(traceback.format_exc())
             Logger.print_error("Klipper installation failed!")
-            return
+            return False
 
-    def update(self) -> None:
-        Logger.print_dialog(
-            DialogType.WARNING,
-            [
-                "Do NOT continue if there are ongoing prints running!",
-                "All Klipper instances will be restarted during the update process and "
-                "ongoing prints WILL FAIL.",
-            ],
-        )
+        return True
 
-        if not get_confirm("Update Klipper now?"):
-            return
+    def update(self, interactive: bool = True) -> bool:
+        """Update Klipper.
 
-        self.__refresh_state()
+        When called from the TUI, a warning and confirmation are shown. The CLI
+        passes ``interactive=False`` to run silently.
 
-        if self.settings.kiauh.backup_before_update:
-            backup_klipper_dir()
+        Returns ``True`` on success and ``False`` if the update could not be completed.
+        """
+        if interactive:
+            Logger.print_dialog(
+                DialogType.WARNING,
+                [
+                    "Do NOT continue if there are ongoing prints running!",
+                    "All Klipper instances will be restarted during the update process and "
+                    "ongoing prints WILL FAIL.",
+                ],
+            )
 
-        InstanceManager.stop_all(self.klipper_list)
-        git_pull_wrapper(KLIPPER_DIR)
-        install_klipper_packages()
-        install_python_requirements(KLIPPER_ENV_DIR, KLIPPER_REQ_FILE)
-        InstanceManager.start_all(self.klipper_list)
+            if not get_confirm("Update Klipper now?"):
+                return False
+
+        self._refresh_state()
+
+        try:
+            if self.settings.kiauh.backup_before_update:
+                backup_klipper_dir()
+
+            InstanceManager.stop_all(self.klipper_list)
+            git_pull_wrapper(KLIPPER_DIR)
+            install_klipper_packages()
+            install_python_requirements(KLIPPER_ENV_DIR, KLIPPER_REQ_FILE)
+            InstanceManager.start_all(self.klipper_list)
+        except Exception:
+            Logger.print_error(traceback.format_exc())
+            Logger.print_error("Error while updating Klipper!")
+            return False
+
+        return True
 
     def remove(
         self,
         remove_service: bool,
         remove_dir: bool,
         remove_env: bool,
-    ) -> None:
-        self.__refresh_state()
+        *,
+        remove_all: bool = False,
+        instance_suffixes: List[str] | None = None,
+        interactive: bool = True,
+    ) -> bool:
+        """Remove Klipper.
 
-        completion_msg = Message(
-            title="Klipper Removal Process completed",
-            color=Color.GREEN,
-        )
+        When called from the TUI, the user selects instances interactively. In
+        headless mode (``interactive=False``) the caller MUST express explicit
+        intent: pass ``remove_all=True`` to wipe every instance or
+        ``instance_suffixes=[...]`` to remove a named subset. Without explicit
+        intent the service refuses and removes nothing so a CLI user can never
+        accidentally destroy every Klipper instance on the machine.
 
-        if remove_service:
-            Logger.print_status("Removing Klipper instances ...")
-            if self.klipper_list:
-                instances_to_remove = self.__get_instances_to_remove()
-                self.__remove_instances(instances_to_remove)
-                if instances_to_remove:
-                    instance_names = [
-                        i.service_file_path.stem for i in instances_to_remove
+        Returns ``True`` on success and ``False`` if removal could not be completed.
+        """
+        self._refresh_state()
+
+        try:
+            if interactive:
+                completion_msg = Message(
+                    title="Klipper Removal Process completed",
+                    color=Color.GREEN,
+                )
+
+                if remove_service:
+                    Logger.print_status("Removing Klipper instances ...")
+                    if self.klipper_list:
+                        instances_to_remove = self._get_instances_to_remove()
+                        self.__remove_instances(instances_to_remove)
+                        if instances_to_remove:
+                            instance_names = [
+                                i.service_file_path.stem for i in instances_to_remove
+                            ]
+                            txt = f"● Klipper instances removed: {', '.join(instance_names)}"
+                            completion_msg.text.append(txt)
+                    else:
+                        Logger.print_info("No Klipper Services installed! Skipped ...")
+
+                if (remove_dir or remove_env) and unit_file_exists(
+                    "klipper", suffix="service"
+                ):
+                    completion_msg.text = [
+                        "Some Klipper services are still installed:",
+                        f"● '{KLIPPER_DIR}' was not removed, even though selected for removal.",
+                        f"● '{KLIPPER_ENV_DIR}' was not removed, even though selected for removal.",
                     ]
-                    txt = f"● Klipper instances removed: {', '.join(instance_names)}"
-                    completion_msg.text.append(txt)
+                else:
+                    if remove_dir:
+                        Logger.print_status("Removing Klipper local repository ...")
+                        if run_remove_routines(KLIPPER_DIR):
+                            completion_msg.text.append(
+                                "● Klipper local repository removed"
+                            )
+                    if remove_env:
+                        Logger.print_status("Removing Klipper Python environment ...")
+                        if run_remove_routines(KLIPPER_ENV_DIR):
+                            completion_msg.text.append(
+                                "● Klipper Python environment removed"
+                            )
+
+                if completion_msg.text:
+                    completion_msg.text.insert(
+                        0, "The following actions were performed:"
+                    )
+                else:
+                    completion_msg.color = Color.YELLOW
+                    completion_msg.centered = True
+                    completion_msg.text = ["Nothing to remove."]
+
+                self.msgsvc.set_message(completion_msg)
             else:
-                Logger.print_info("No Klipper Services installed! Skipped ...")
+                if remove_service and self.klipper_list:
+                    selected = self._select_instances_for_headless_removal(
+                        remove_all, instance_suffixes
+                    )
+                    if selected is None:
+                        Logger.print_error(
+                            "Refusing to remove Klipper instances: no explicit "
+                            "intent. Pass remove_all=True or instance_suffixes."
+                        )
+                        return False
+                    self.__remove_instances(selected)
 
-        if (remove_dir or remove_env) and unit_file_exists("klipper", suffix="service"):
-            completion_msg.text = [
-                "Some Klipper services are still installed:",
-                f"● '{KLIPPER_DIR}' was not removed, even though selected for removal.",
-                f"● '{KLIPPER_ENV_DIR}' was not removed, even though selected for removal.",
-            ]
-        else:
-            if remove_dir:
-                Logger.print_status("Removing Klipper local repository ...")
-                if run_remove_routines(KLIPPER_DIR):
-                    completion_msg.text.append("● Klipper local repository removed")
-            if remove_env:
-                Logger.print_status("Removing Klipper Python environment ...")
-                if run_remove_routines(KLIPPER_ENV_DIR):
-                    completion_msg.text.append("● Klipper Python environment removed")
+                if (remove_dir or remove_env) and unit_file_exists(
+                    "klipper", suffix="service"
+                ):
+                    Logger.print_info(
+                        "Klipper services still installed; skipping repository/env removal."
+                    )
+                    return True
 
-        if completion_msg.text:
-            completion_msg.text.insert(0, "The following actions were performed:")
-        else:
-            completion_msg.color = Color.YELLOW
-            completion_msg.centered = True
-            completion_msg.text = ["Nothing to remove."]
+                if remove_dir:
+                    run_remove_routines(KLIPPER_DIR)
+                if remove_env:
+                    run_remove_routines(KLIPPER_ENV_DIR)
+        except Exception:
+            Logger.print_error(traceback.format_exc())
+            Logger.print_error("Error while removing Klipper!")
+            return False
 
-        self.msgsvc.set_message(completion_msg)
+        return True
 
     def __get_install_count_and_name_dict(self) -> Tuple[int, Dict[int, str]]:
         install_count: int | None
@@ -240,9 +343,16 @@ class KlipperSetupService:
 
         return install_count, name_dict
 
-    def __run_setup(self, name_dict: Dict[int, str], create_example_cfg: bool) -> None:
+    def __run_setup(
+        self,
+        name_dict: Dict[int, str],
+        create_example_cfg: bool,
+        interactive: bool = True,
+    ) -> None:
         if not self.klipper_list:
-            self.__install_deps()
+            # Only create a fresh venv when none exists; existing venvs are
+            # preserved in both TUI and CLI modes.
+            self.__install_deps(interactive=interactive)
 
         for i in name_dict:
             # skip this iteration if there is already an instance with the name
@@ -266,9 +376,9 @@ class KlipperSetupService:
         handle_disruptive_system_packages()
 
         # step 5: check for required group membership
-        check_user_groups()
+        check_user_groups(interactive=interactive)
 
-    def __install_deps(self) -> None:
+    def __install_deps(self, interactive: bool = True) -> None:
         default_repo = (KLIPPER_REPO_URL, "master")
         repo = self.settings.klipper.repositories
         # pull the first repo defined in kiauh.cfg or fallback to the official Klipper repo
@@ -277,13 +387,19 @@ class KlipperSetupService:
 
         try:
             install_klipper_packages()
-            if create_python_venv(KLIPPER_ENV_DIR, False, False, self.settings.klipper.use_python_binary):
+            if create_python_venv(
+                KLIPPER_ENV_DIR,
+                force=False,
+                allow_access_to_system_site_packages=False,
+                use_python_binary=self.settings.klipper.use_python_binary,
+                interactive=interactive,
+            ):
                 install_python_requirements(KLIPPER_ENV_DIR, KLIPPER_REQ_FILE)
         except Exception:
             Logger.print_error("Error during installation of Klipper requirements!")
             raise
 
-    def __display_moonraker_info(self) -> bool:
+    def _display_moonraker_info(self) -> bool:
         # todo: only show the klipper instances that are not already installed
         Logger.print_dialog(
             DialogType.INFO,
@@ -308,6 +424,17 @@ class KlipperSetupService:
             else:
                 name_dict[key] = str(len(name_dict) + 1)
 
+    def __count_from_moonraker_match(
+        self, install_count: int, name_dict: Dict[int, str]
+    ) -> bool:
+        """Return True when the count/names came from matching Moonraker instances."""
+        if len(self.moonraker_list) <= len(self.klipper_list):
+            return False
+        if install_count != len(self.moonraker_list):
+            return False
+        expected = [m.suffix for m in self.moonraker_list]
+        return list(name_dict.values()) == expected
+
     def __use_custom_names_or_go_back(self) -> bool | None:
         print_select_custom_name_dialog()
         _input: bool | None = get_confirm(
@@ -317,7 +444,7 @@ class KlipperSetupService:
         )
         return _input
 
-    def __get_instances_to_remove(self) -> List[Klipper] | None:
+    def _get_instances_to_remove(self) -> List[Klipper] | None:
         start_index = 1
         curr_instances: List[Klipper] = self.klipper_list
         instance_count = len(curr_instances)
@@ -341,6 +468,26 @@ class KlipperSetupService:
 
         return [instance_map[selection]]
 
+    def _select_instances_for_headless_removal(
+        self,
+        remove_all: bool,
+        instance_suffixes: List[str] | None,
+    ) -> List[Klipper] | None:
+        """Resolve which instances to remove in headless mode.
+
+        Returns the list of instances to remove, or ``None`` when the caller did
+        not express explicit intent (no ``remove_all`` and no ``instance_suffixes``).
+        A ``None`` return is the "refuse to wipe everything" signal the CLI path
+        relies on. Kept as a single-public-seam helper (no name mangling) so
+        tests can patch it without brittle ``_Class__method`` access.
+        """
+        if remove_all:
+            return list(self.klipper_list)
+        if instance_suffixes:
+            wanted = set(instance_suffixes)
+            return [i for i in self.klipper_list if i.suffix in wanted]
+        return None
+
     def __remove_instances(
         self,
         instance_list: List[Klipper] | None,
@@ -353,11 +500,11 @@ class KlipperSetupService:
                 f"Removing instance {instance.service_file_path.stem} ..."
             )
             InstanceManager.remove(instance)
-            self.__delete_klipper_env_file(instance)
+            self._delete_klipper_env_file(instance)
 
-        self.__refresh_state()
+        self._refresh_state()
 
-    def __delete_klipper_env_file(self, instance: Klipper):
+    def _delete_klipper_env_file(self, instance: Klipper):
         Logger.print_status(f"Remove '{instance.env_file}'")
         if not instance.env_file.exists():
             msg = f"Env file in {instance.base.sysd_dir} not found. Skipped ..."
