@@ -22,16 +22,18 @@ from components.klipperscreen.klipperscreen import (
 )
 from components.moonraker.services.moonraker_setup_service import MoonrakerSetupService
 from components.moonraker.utils.utils import get_moonraker_status
-from components.webui_client.client_config.client_config_setup import (
-    update_client_config,
-)
-from components.webui_client.client_setup import update_client
 from components.webui_client.client_utils import (
     get_client_config_status,
     get_client_status,
 )
 from components.webui_client.fluidd_data import FluiddData
 from components.webui_client.mainsail_data import MainsailData
+from components.webui_client.services.web_client_config_setup_service import (
+    WebClientConfigSetupService,
+)
+from components.webui_client.services.web_client_setup_service import (
+    WebClientSetupService,
+)
 from core.logger import DialogType, Logger
 from core.menus import Option
 from core.menus.base_menu import BaseMenu
@@ -203,29 +205,25 @@ class UpdateMenu(BaseMenu):
     def update_mainsail(self, **kwargs) -> None:
         self._run_update_routine(
             "mainsail",
-            update_client,
-            self.mainsail_data,
+            WebClientSetupService("mainsail").update,
         )
 
     def update_mainsail_config(self, **kwargs) -> None:
         self._run_update_routine(
             "mainsail_config",
-            update_client_config,
-            self.mainsail_data,
+            WebClientConfigSetupService("mainsail").update,
         )
 
     def update_fluidd(self, **kwargs) -> None:
         self._run_update_routine(
             "fluidd",
-            update_client,
-            self.fluidd_data,
+            WebClientSetupService("fluidd").update,
         )
 
     def update_fluidd_config(self, **kwargs) -> None:
         self._run_update_routine(
             "fluidd_config",
-            update_client_config,
-            self.fluidd_data,
+            WebClientConfigSetupService("fluidd").update,
         )
 
     def update_klipperscreen(self, **kwargs) -> None:

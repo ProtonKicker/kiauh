@@ -20,6 +20,7 @@ from components.klipper.klipper import Klipper
 from components.webui_client import MODULE_PATH
 from components.webui_client.base_data import (
     BaseWebClient,
+    BaseWebClientConfig,
     WebClientType,
 )
 from components.webui_client.client_dialogs import print_client_port_select_dialog
@@ -482,3 +483,18 @@ def set_listen_port(client: BaseWebClient, curr_port: int, new_port: int) -> Non
 
     with open(config, "w") as f:
         f.writelines(lines)
+
+
+def create_client_config_symlink(
+    client_config: BaseWebClientConfig, klipper_instances: List[Klipper]
+) -> None:
+    """Symlink the client config file into every Klipper instance's config dir."""
+    for instance in klipper_instances:
+        Logger.print_status(f"Create symlink for {client_config.config_filename} ...")
+        source = Path(client_config.config_dir, client_config.config_filename)
+        target = instance.base.cfg_dir
+        Logger.print_status(f"Linking {source} to {target}")
+        try:
+            create_symlink(source, target)
+        except Exception:
+            Logger.print_error("Creating symlink failed!")

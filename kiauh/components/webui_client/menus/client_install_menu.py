@@ -12,11 +12,13 @@ import textwrap
 from typing import Type
 
 from components.webui_client.base_data import BaseWebClient
-from components.webui_client.client_setup import install_client
 from components.webui_client.client_utils import (
     get_client_port_selection,
     get_nginx_listen_port,
     set_listen_port,
+)
+from components.webui_client.services.web_client_setup_service import (
+    WebClientSetupService,
 )
 from core.logger import Logger
 from core.menus import Option
@@ -65,7 +67,9 @@ class ClientInstallMenu(BaseMenu):
         print(menu, end="")
 
     def reinstall_client(self, **kwargs) -> None:
-        install_client(self.client, settings=self.settings, reinstall=True)
+        WebClientSetupService(self.client.name).install(
+            reinstall=True, interactive=True
+        )
 
     def change_listen_port(self, **kwargs) -> None:
         curr_port = self._get_current_port()

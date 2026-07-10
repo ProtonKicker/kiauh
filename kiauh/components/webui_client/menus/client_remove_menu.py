@@ -11,8 +11,10 @@ from __future__ import annotations
 import textwrap
 from typing import Type
 
-from components.webui_client import client_remove
 from components.webui_client.base_data import BaseWebClient
+from components.webui_client.services.web_client_setup_service import (
+    WebClientSetupService,
+)
 from core.menus import Option
 from core.menus.base_menu import BaseMenu
 from core.types.color import Color
@@ -100,13 +102,12 @@ class ClientRemoveMenu(BaseMenu):
             print(Color.apply("Nothing selected ...", Color.RED))
             return
 
-        completion_msg = client_remove.run_client_removal(
-            client=self.client,
+        WebClientSetupService(self.client.name).remove(
             remove_client=self.remove_client,
             remove_client_cfg=self.remove_client_cfg,
             backup_config=self.backup_config_json,
+            interactive=True,
         )
-        self.message_service.set_message(completion_msg)
 
         self.remove_client = False
         self.remove_client_cfg = False

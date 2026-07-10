@@ -10,13 +10,13 @@ from __future__ import annotations
 
 from typing import List, Literal, Type
 
-from core.logger import Logger, DialogType
+from core.logger import DialogType, Logger
 from core.menus import Option
 from core.menus.base_menu import BaseMenu
 from core.settings.kiauh_settings import KiauhSettings, Repository
 from core.types.color import Color
 from procedures.switch_repo import run_switch_repo_routine
-from utils.input_utils import get_string_input, get_number_input, get_confirm
+from utils.input_utils import get_confirm, get_number_input, get_string_input
 
 
 # noinspection PyUnusedLocal

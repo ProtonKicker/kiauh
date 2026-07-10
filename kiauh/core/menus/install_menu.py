@@ -15,16 +15,17 @@ from components.crowsnest.crowsnest import install_crowsnest
 from components.klipper.services.klipper_setup_service import KlipperSetupService
 from components.klipperscreen.klipperscreen import install_klipperscreen
 from components.moonraker.services.moonraker_setup_service import MoonrakerSetupService
-from components.webui_client.client_config.client_config_setup import (
-    install_client_config,
-)
-from components.webui_client.client_setup import install_client
 from components.webui_client.fluidd_data import FluiddData
 from components.webui_client.mainsail_data import MainsailData
 from components.webui_client.menus.client_install_menu import ClientInstallMenu
+from components.webui_client.services.web_client_config_setup_service import (
+    WebClientConfigSetupService,
+)
+from components.webui_client.services.web_client_setup_service import (
+    WebClientSetupService,
+)
 from core.menus import Option
 from core.menus.base_menu import BaseMenu
-from core.settings.kiauh_settings import KiauhSettings
 from core.types.color import Color
 
 
@@ -87,20 +88,20 @@ class InstallMenu(BaseMenu):
         if client.client_dir.exists():
             ClientInstallMenu(client, self.__class__).run()
         else:
-            install_client(client, settings=KiauhSettings())
+            WebClientSetupService("mainsail").install()
 
     def install_mainsail_config(self, **kwargs) -> None:
-        install_client_config(MainsailData())
+        WebClientConfigSetupService("mainsail").install()
 
     def install_fluidd(self, **kwargs) -> None:
         client: FluiddData = FluiddData()
         if client.client_dir.exists():
             ClientInstallMenu(client, self.__class__).run()
         else:
-            install_client(client, settings=KiauhSettings())
+            WebClientSetupService("fluidd").install()
 
     def install_fluidd_config(self, **kwargs) -> None:
-        install_client_config(FluiddData())
+        WebClientConfigSetupService("fluidd").install()
 
     def install_klipperscreen(self, **kwargs) -> None:
         install_klipperscreen()
