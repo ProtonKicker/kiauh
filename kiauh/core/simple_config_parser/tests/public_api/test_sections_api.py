@@ -7,7 +7,6 @@
 # ======================================================================= #
 
 import pytest
-
 from core.simple_config_parser.simple_config_parser import (
     DuplicateSectionError,
 )

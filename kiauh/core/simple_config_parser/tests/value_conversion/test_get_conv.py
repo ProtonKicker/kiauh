@@ -8,7 +8,6 @@
 from pathlib import Path
 
 import pytest
-
 from core.simple_config_parser.simple_config_parser import SimpleConfigParser
 
 BASE_DIR = Path(__file__).parent.parent / "assets"

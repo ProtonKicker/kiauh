@@ -9,7 +9,6 @@
 from pathlib import Path
 
 import pytest
-
 from core.simple_config_parser.simple_config_parser import SimpleConfigParser
 from core.simple_config_parser.tests.utils import load_testdata_from_file
 
