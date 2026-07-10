@@ -135,10 +135,12 @@ function main() {
    export PYTHONPATH="${entrypoint}"
 
    clear -x
-   python3 "${entrypoint}/kiauh/main.py"
+   python3 "${entrypoint}/kiauh/main.py" "$@"
 }
 
-check_if_ratos
-check_euid
-kiauh_update_dialog
-main
+# skip update prompt when arguments are passed -> dont block cli runs
+if [[ $# -eq 0 ]]; then
+  kiauh_update_dialog
+fi
+
+main "$@"

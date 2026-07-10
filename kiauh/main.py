@@ -9,6 +9,7 @@
 import io
 import sys
 
+from core.cli import run_cli
 from core.logger import Logger
 from core.menus.main_menu import MainMenu
 from core.settings.kiauh_settings import KiauhSettings
@@ -21,12 +22,16 @@ def ensure_encoding() -> None:
 
 
 def main() -> None:
-    try:
-        KiauhSettings()
-        ensure_encoding()
-        MainMenu().run()
-    except KeyboardInterrupt:
-        Logger.print_ok("\nHappy printing!\n", prefix=False)
+    rc = run_cli()
+    if rc == -1:
+        try:
+            KiauhSettings()
+            ensure_encoding()
+            MainMenu().run()
+        except KeyboardInterrupt:
+            Logger.print_ok("\nHappy printing!\n", prefix=False)
+    elif rc > 0:
+        sys.exit(rc)
 
 
 if __name__ == "__main__":
