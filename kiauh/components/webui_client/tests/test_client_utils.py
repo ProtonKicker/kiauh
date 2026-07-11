@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any, List
 
 import pytest
@@ -14,6 +15,7 @@ from components.webui_client.client_utils import (
     get_client_status,
     get_current_client_config,
     get_download_url,
+    get_existing_clients,
     get_local_client_version,
     get_next_free_port,
     get_nginx_listen_port,
@@ -346,3 +348,56 @@ class TestGetCurrentClientConfig:
 
         result = get_current_client_config()
         assert "Mainsail-Config" in result
+
+
+class TestGetExistingClients:
+    @staticmethod
+    def _client(installed: bool) -> SimpleNamespace:
+        return SimpleNamespace(client_dir=SimpleNamespace(exists=lambda: installed))
+
+    def test_returns_only_installed_clients(self, monkeypatch) -> None:
+        mainsail = self._client(installed=True)
+        fluidd = self._client(installed=False)
+        monkeypatch.setattr(
+            client_utils,
+            "CLIENTS",
+            {"mainsail": lambda: mainsail, "fluidd": lambda: fluidd},
+        )
+
+        assert get_existing_clients() == [mainsail]
+
+    def test_returns_only_fluidd_when_only_fluidd_installed(self, monkeypatch) -> None:
+        mainsail = self._client(installed=False)
+        fluidd = self._client(installed=True)
+        monkeypatch.setattr(
+            client_utils,
+            "CLIENTS",
+            {"mainsail": lambda: mainsail, "fluidd": lambda: fluidd},
+        )
+
+        assert get_existing_clients() == [fluidd]
+
+    def test_returns_both_clients_in_order_when_both_installed(
+        self, monkeypatch
+    ) -> None:
+        mainsail = self._client(installed=True)
+        fluidd = self._client(installed=True)
+        monkeypatch.setattr(
+            client_utils,
+            "CLIENTS",
+            {"mainsail": lambda: mainsail, "fluidd": lambda: fluidd},
+        )
+
+        assert get_existing_clients() == [mainsail, fluidd]
+
+    def test_returns_empty_list_when_no_client_installed(self, monkeypatch) -> None:
+        monkeypatch.setattr(
+            client_utils,
+            "CLIENTS",
+            {
+                "mainsail": lambda: self._client(installed=False),
+                "fluidd": lambda: self._client(installed=False),
+            },
+        )
+
+        assert get_existing_clients() == []
