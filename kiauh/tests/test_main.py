@@ -56,9 +56,7 @@ class TestMainDispatch:
         assert _FakeMainMenu.instances
         assert all(m._run for m in _FakeMainMenu.instances)
 
-    def test_cli_success_returns_cleanly(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_cli_success_returns_cleanly(self, monkeypatch: pytest.MonkeyPatch) -> None:
         # rc == 0 means the CLI succeeded; the TUI must NOT start and main must
         # NOT call sys.exit.
         monkeypatch.setattr(main_module, "run_cli", lambda: 0)
@@ -68,9 +66,7 @@ class TestMainDispatch:
 
         assert _FakeMainMenu.instances == []
 
-    def test_cli_failure_exits_nonzero(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_cli_failure_exits_nonzero(self, monkeypatch: pytest.MonkeyPatch) -> None:
         # rc > 0 means the CLI reported a failure; main must propagate via sys.exit.
         monkeypatch.setattr(main_module, "run_cli", lambda: 2)
         _patch_tui_seeds(monkeypatch)
@@ -96,3 +92,26 @@ class TestMainDispatch:
         monkeypatch.setattr(main_module, "MainMenu", _InterruptingMenu)
 
         main_module.main()  # must not raise; KeyboardInterrupt is absorbed
+
+    def test_tui_keyboard_interrupt_stops_spinners(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # Any loading spinner still running when the user hits Ctrl-C must be
+        # stopped before the interpreter starts shutting down.
+        stopped: list[bool] = []
+
+        class _InterruptingMenu(_FakeMainMenu):
+            def run(self) -> None:
+                raise KeyboardInterrupt()
+
+        monkeypatch.setattr(main_module, "run_cli", lambda: -1)
+        monkeypatch.setattr(main_module, "KiauhSettings", lambda: None)
+        monkeypatch.setattr(main_module, "ensure_encoding", lambda: None)
+        monkeypatch.setattr(main_module, "MainMenu", _InterruptingMenu)
+        monkeypatch.setattr(
+            main_module.Spinner, "stop_all", lambda: stopped.append(True)
+        )
+
+        main_module.main()
+
+        assert stopped == [True]

@@ -13,6 +13,7 @@ from core.cli import run_cli
 from core.logger import Logger
 from core.menus.main_menu import MainMenu
 from core.settings.kiauh_settings import KiauhSettings
+from core.spinner import Spinner
 
 
 def ensure_encoding() -> None:
@@ -29,6 +30,8 @@ def main() -> None:
             ensure_encoding()
             MainMenu().run()
         except KeyboardInterrupt:
+            # in case any spinner is still running, stop it before exiting
+            Spinner.stop_all()
             Logger.print_ok("\nHappy printing!\n", prefix=False)
     elif rc > 0:
         sys.exit(rc)

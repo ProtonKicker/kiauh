@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Any, List
+from contextlib import contextmanager
+from typing import Any, Generator, List
 
 import pytest
 from core.menus.update_menu import UpdateMenu
@@ -51,6 +52,12 @@ def patched_menu(monkeypatch: pytest.MonkeyPatch) -> UpdateMenu:
             pass
 
         def stop(self):
+            pass
+
+        def pause(self):
+            pass
+
+        def resume(self):
             pass
 
     monkeypatch.setattr("core.menus.base_menu.Spinner", FakeSpinner)
@@ -154,6 +161,51 @@ class TestSystemUpdates:
         patched_menu._run_system_updates()
 
         assert upgraded == [["curl", "git"]]
+
+
+class TestSpinnerPauseDuringSystemUpdateFetch:
+    def test_fetch_system_package_status_pauses_spinner_during_apt_update(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """The loading spinner must be paused while ``apt-get update`` runs so
+        that a possible sudo password prompt is not overwritten by the spinner.
+        """
+        calls: list[str | tuple[str, bool]] = []
+
+        @contextmanager
+        def recording_pause_loading(self: UpdateMenu) -> Generator[None, None, None]:
+            calls.append("pause")
+            yield
+            calls.append("resume")
+
+        monkeypatch.setattr(UpdateMenu, "pause_loading", recording_pause_loading)
+        monkeypatch.setattr(
+            "core.menus.update_menu.update_system_package_lists",
+            lambda silent: calls.append(("apt", silent)),
+        )
+        monkeypatch.setattr(
+            "core.menus.update_menu.get_upgradable_packages",
+            lambda: ["curl"],
+        )
+        monkeypatch.setattr(
+            "core.menus.update_menu.Logger.print_warn", lambda *a, **k: None
+        )
+
+        menu = UpdateMenu()
+        # the constructor already calls _fetch_system_package_update_status once
+        assert calls == ["pause", ("apt", True), "resume"]
+
+        menu._fetch_system_package_update_status()
+
+        # every fetch must pause the spinner around the apt call
+        assert calls == [
+            "pause",
+            ("apt", True),
+            "resume",
+            "pause",
+            ("apt", True),
+            "resume",
+        ]
 
 
 class TestUpdateAll:

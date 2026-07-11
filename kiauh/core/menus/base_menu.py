@@ -14,8 +14,9 @@ import sys
 import textwrap
 import traceback
 from abc import abstractmethod
+from contextlib import contextmanager
 from enum import Enum
-from typing import Dict, Type
+from typing import Dict, Iterator, Type
 
 from core.logger import Logger
 from core.menus import FooterType, Option
@@ -173,12 +174,31 @@ class BaseMenu(metaclass=PostInitCaller):
         raise NotImplementedError
 
     def is_loading(self, state: bool) -> None:
-        if not self.spinner and state:
-            self.spinner = Spinner(self.loading_msg)
-            self.spinner.start()
+        if state:
+            if self.spinner is None:
+                self.spinner = Spinner(self.loading_msg)
+                self.spinner.start()
         else:
-            self.spinner.stop()
-            self.spinner = None
+            if self.spinner is not None:
+                self.spinner.stop()
+                self.spinner = None
+
+    @contextmanager
+    def pause_loading(self) -> Iterator[None]:
+        """Temporarily pause the loading spinner while an interactive command runs.
+
+        Use this around subprocess calls that may prompt the user on the
+        terminal (for example ``sudo`` asking for a password). Pausing clears
+        the spinner line so the prompt is not overwritten.
+        """
+        spinner = self.spinner
+        if spinner is not None:
+            spinner.pause()
+        try:
+            yield
+        finally:
+            if spinner is not None:
+                spinner.resume()
 
     def __print_menu_title(self) -> None:
         count = 62 - len(str(self.title_color)) - len(str(Color.RST))
@@ -232,6 +252,14 @@ class BaseMenu(metaclass=PostInitCaller):
             )
 
             self.run()
+
+        except KeyboardInterrupt:
+            # Stop the spinner so the terminal is left in a clean state and the
+            # animation thread does not keep running during interpreter shutdown.
+            if self.spinner is not None:
+                self.spinner.stop()
+                self.spinner = None
+            raise
 
         except Exception as e:
             Logger.print_error(

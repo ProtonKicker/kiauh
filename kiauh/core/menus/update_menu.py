@@ -256,7 +256,8 @@ class UpdateMenu(BaseMenu):
         # even when package metadata is unavailable. Dependency installation still
         # fails fast elsewhere.
         try:
-            update_system_package_lists(silent=True)
+            with self.pause_loading():
+                update_system_package_lists(silent=True)
         except RuntimeError as exc:
             Logger.print_warn(
                 "Could not update the system package lists; "
@@ -274,7 +275,7 @@ class UpdateMenu(BaseMenu):
         elif local_version != remote_version:
             color = Color.YELLOW
 
-        return str(Color.apply(local_version or '-', color))
+        return str(Color.apply(local_version or "-", color))
 
     def _set_status_data(self, name: str, status_fn: Callable, *args) -> None:
         comp_status: ComponentStatus = status_fn(*args)
@@ -331,13 +332,19 @@ class UpdateMenu(BaseMenu):
         elif name == "moonraker":
             self._set_status_data("moonraker", get_moonraker_status)
         elif name == "mainsail":
-            self._set_status_data("mainsail", get_client_status, self.mainsail_data, True)
+            self._set_status_data(
+                "mainsail", get_client_status, self.mainsail_data, True
+            )
         elif name == "mainsail_config":
-            self._set_status_data("mainsail_config", get_client_config_status, self.mainsail_data)
+            self._set_status_data(
+                "mainsail_config", get_client_config_status, self.mainsail_data
+            )
         elif name == "fluidd":
             self._set_status_data("fluidd", get_client_status, self.fluidd_data, True)
         elif name == "fluidd_config":
-            self._set_status_data("fluidd_config", get_client_config_status, self.fluidd_data)
+            self._set_status_data(
+                "fluidd_config", get_client_config_status, self.fluidd_data
+            )
         elif name == "klipperscreen":
             self._set_status_data("klipperscreen", get_klipperscreen_status)
         elif name == "crowsnest":
@@ -362,7 +369,8 @@ class UpdateMenu(BaseMenu):
 
             Logger.print_status("Upgrading system packages ...")
 
-            upgrade_system_packages(self.packages)
+            with self.pause_loading():
+                upgrade_system_packages(self.packages)
             self._fetch_system_package_update_status()
         except Exception as e:
             Logger.print_error(f"Error upgrading system packages:\n{e}")
