@@ -7,8 +7,6 @@
 #  This file may be distributed under the terms of the GNU GPLv3 license  #
 # ======================================================================= #
 
-import os
-import pwd
 from pathlib import Path
 
 # global dependencies
@@ -16,9 +14,6 @@ GLOBAL_DEPS = ["git", "wget", "curl", "unzip", "dfu-util", "python3-virtualenv"]
 
 # strings
 INVALID_CHOICE = "Invalid choice. Please select a valid value."
-
-# current user
-CURRENT_USER = pwd.getpwuid(os.getuid())[0]
 
 # dirs
 SYSTEMD = Path("/etc/systemd/system")

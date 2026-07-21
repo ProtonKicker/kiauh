@@ -22,14 +22,13 @@ from components.moonraker import (
     MOONRAKER_LOG_NAME,
     MOONRAKER_SERVICE_TEMPLATE,
 )
-from core.constants import CURRENT_USER
 from core.instance_manager.base_instance import BaseInstance
 from core.logger import Logger
 from core.simple_config_parser.simple_config_parser import (
     SimpleConfigParser,
 )
 from utils.fs_utils import create_folders
-from utils.sys_utils import get_service_file_path
+from utils.sys_utils import get_current_user, get_service_file_path
 
 
 # noinspection PyMethodMayBeStatic
@@ -98,7 +97,7 @@ class Moonraker:
 
         service_content = template_content.replace(
             "%USER%",
-            CURRENT_USER,
+            get_current_user(),
         )
         service_content = service_content.replace(
             "%MOONRAKER_DIR%",

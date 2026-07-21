@@ -18,11 +18,13 @@ from utils.sys_utils import (
     create_service_file,
     download_file,
     download_progress,
+    get_current_user,
     get_distro_info,
     get_ipv4_addr,
     get_service_file_path,
     get_system_timezone,
     get_upgradable_packages,
+    get_user_groups,
     install_python_packages,
     install_python_requirements,
     install_system_packages,
@@ -425,7 +427,7 @@ class TestDownloadFile:
             "utils.sys_utils.urllib.request.urlretrieve", fake_urlretrieve
         )
         download_file("http://x/file", Path("/target"), show_progress=False)
-        assert calls == [("http://x/file", "/target", None)]
+        assert calls == [("http://x/file", str(Path("/target")), None)]
 
     def test_with_progress(self, monkeypatch) -> None:
         calls: List[tuple] = []
@@ -727,3 +729,44 @@ class TestGetSystemTimezone:
             lambda *a, **k: (_ for _ in ()).throw(CalledProcessError(1, "timedatectl")),
         )
         assert get_system_timezone() == "UTC"
+
+
+class TestGetCurrentUser:
+    def test_posix_uses_pwd(self, monkeypatch) -> None:
+        import sys
+        import types
+
+        fake_pwd = types.SimpleNamespace(getpwuid=lambda uid: ["alice", "x", uid])
+        monkeypatch.setitem(sys.modules, "pwd", fake_pwd)
+        monkeypatch.setattr("utils.sys_utils.os.name", "posix")
+        monkeypatch.setattr("utils.sys_utils.os.getuid", lambda: 1000, raising=False)
+
+        assert get_current_user() == "alice"
+
+    def test_non_posix_uses_getpass(self, monkeypatch) -> None:
+        monkeypatch.setattr("utils.sys_utils.os.name", "nt")
+        monkeypatch.setattr("getpass.getuser", lambda: "bob")
+
+        assert get_current_user() == "bob"
+
+
+class TestGetUserGroups:
+    def test_posix_maps_gids_to_names(self, monkeypatch) -> None:
+        import sys
+        import types
+
+        fake_grp = types.SimpleNamespace(
+            getgrgid=lambda gid: types.SimpleNamespace(gr_name=f"g{gid}")
+        )
+        monkeypatch.setitem(sys.modules, "grp", fake_grp)
+        monkeypatch.setattr("utils.sys_utils.os.name", "posix")
+        monkeypatch.setattr(
+            "utils.sys_utils.os.getgroups", lambda: [10, 20], raising=False
+        )
+
+        assert get_user_groups() == ["g10", "g20"]
+
+    def test_non_posix_returns_empty(self, monkeypatch) -> None:
+        monkeypatch.setattr("utils.sys_utils.os.name", "nt")
+
+        assert get_user_groups() == []

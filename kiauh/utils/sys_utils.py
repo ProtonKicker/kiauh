@@ -28,6 +28,29 @@ from core.logger import Logger
 from utils.fs_utils import check_file_exist, remove_with_sudo
 from utils.input_utils import get_confirm
 
+
+def get_current_user() -> str:
+    """Return the current user's login name (cross-platform)."""
+    if os.name == "posix":
+        import pwd
+
+        return pwd.getpwuid(os.getuid())[0]
+
+    import getpass
+
+    return getpass.getuser()
+
+
+def get_user_groups() -> List[str]:
+    """Return the current user's group names (empty on non-Unix)."""
+    if os.name != "posix":
+        return []
+
+    import grp
+
+    return [grp.getgrgid(gid).gr_name for gid in os.getgroups()]
+
+
 SysCtlServiceAction = Literal[
     "start",
     "stop",

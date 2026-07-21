@@ -507,9 +507,10 @@ class TestPackaging:
     def test_pyproject_metadata_allows_editable_dev_install(self) -> None:
         project_root = Path(__file__).resolve().parents[4]
         import subprocess as sp
+        import sys
 
         result = sp.run(
-            ["python", "-m", "pip", "install", "--dry-run", "-e", ".[dev]"],
+            [sys.executable, "-m", "pip", "install", "--dry-run", "-e", ".[dev]"],
             cwd=project_root,
             capture_output=True,
             text=True,

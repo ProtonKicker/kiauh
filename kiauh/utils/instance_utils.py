@@ -32,6 +32,9 @@ def get_instances(
     name = convert_camelcase_to_kebabcase(instance_type.__name__)
     pattern = re.compile(f"^{name}(-[0-9a-zA-Z]+)?.service$")
 
+    if not SYSTEMD.exists():
+        return []
+
     service_list = [
         Path(SYSTEMD, service)
         for service in SYSTEMD.iterdir()

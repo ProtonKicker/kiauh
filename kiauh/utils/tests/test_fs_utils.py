@@ -151,7 +151,7 @@ class TestRemoveFile:
         with pytest.warns(DeprecationWarning):
             remove_file(Path("/some/file"), sudo=True)
 
-        assert runs == [("sudo rm -f /some/file", True)]
+        assert runs == [(f"sudo rm -f {Path('/some/file')}", True)]
 
 
 class TestRunRemoveRoutines:

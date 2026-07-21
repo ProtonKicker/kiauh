@@ -23,11 +23,10 @@ from components.klipper import (
     KLIPPER_SERVICE_TEMPLATE,
     KLIPPER_UDS_NAME,
 )
-from core.constants import CURRENT_USER
 from core.instance_manager.base_instance import BaseInstance
 from core.logger import Logger
 from utils.fs_utils import create_folders, get_data_dir
-from utils.sys_utils import get_service_file_path
+from utils.sys_utils import get_current_user, get_service_file_path
 
 
 # noinspection PyMethodMayBeStatic
@@ -93,7 +92,7 @@ class Klipper:
 
         service_content = template_content.replace(
             "%USER%",
-            CURRENT_USER,
+            get_current_user(),
         )
         service_content = service_content.replace(
             "%KLIPPER_DIR%",

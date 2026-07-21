@@ -330,10 +330,11 @@ class TestCheckUserGroups:
     def test_interactive_mode_prompts_before_adding_user(self, monkeypatch) -> None:
         from components.klipper.klipper_utils import check_user_groups
 
-        monkeypatch.setattr("os.getgroups", lambda: [])
         monkeypatch.setattr(
-            "grp.getgrgid",
-            lambda gid: type("Group", (), {"gr_name": "tty"})(),
+            "components.klipper.klipper_utils.get_user_groups", lambda: []
+        )
+        monkeypatch.setattr(
+            "components.klipper.klipper_utils.get_current_user", lambda: "tester"
         )
 
         prompted: List[str] = []
@@ -357,10 +358,11 @@ class TestCheckUserGroups:
     def test_headless_mode_auto_adds_without_prompt(self, monkeypatch) -> None:
         from components.klipper.klipper_utils import check_user_groups
 
-        monkeypatch.setattr("os.getgroups", lambda: [])
         monkeypatch.setattr(
-            "grp.getgrgid",
-            lambda gid: type("Group", (), {"gr_name": "tty"})(),
+            "components.klipper.klipper_utils.get_user_groups", lambda: []
+        )
+        monkeypatch.setattr(
+            "components.klipper.klipper_utils.get_current_user", lambda: "tester"
         )
 
         monkeypatch.setattr(

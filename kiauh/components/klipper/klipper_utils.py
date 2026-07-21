@@ -8,8 +8,6 @@
 # ======================================================================= #
 from __future__ import annotations
 
-import grp
-import os
 import shutil
 from pathlib import Path
 from subprocess import CalledProcessError, run
@@ -28,7 +26,6 @@ from components.klipper.klipper_dialogs import (
 )
 from components.webui_client.base_data import BaseWebClient
 from components.webui_client.client_utils import create_client_config_symlink
-from core.constants import CURRENT_USER
 from core.instance_manager.base_instance import SUFFIX_BLACKLIST
 from core.logger import DialogType, Logger
 from core.services.backup_service import BackupService
@@ -42,6 +39,8 @@ from utils.input_utils import get_confirm, get_number_input, get_string_input
 from utils.instance_utils import get_instances
 from utils.sys_utils import (
     cmd_sysctl_service,
+    get_current_user,
+    get_user_groups,
     install_python_packages,
     parse_packages_from_file,
 )
@@ -93,11 +92,13 @@ def check_user_groups(interactive: bool = True) -> None:
     must confirm before groups are modified. When ``interactive`` is false (the
     headless CLI path), groups are added automatically without prompting.
     """
-    user_groups = [grp.getgrgid(gid).gr_name for gid in os.getgroups()]
+    user_groups = get_user_groups()
     missing_groups = [g for g in ["tty", "dialout"] if g not in user_groups]
 
     if not missing_groups:
         return
+
+    current_user = get_current_user()
 
     if interactive:
         Logger.print_dialog(
@@ -116,22 +117,22 @@ def check_user_groups(interactive: bool = True) -> None:
             ],
         )
 
-        if not get_confirm(f"Add user '{CURRENT_USER}' to group(s) now?"):
+        if not get_confirm(f"Add user '{current_user}' to group(s) now?"):
             log = "Skipped adding user to required groups. You might encounter issues."
             Logger.print_warn(log)
             return
     else:
         Logger.print_info(
-            f"Adding user '{CURRENT_USER}' to required groups: "
+            f"Adding user '{current_user}' to required groups: "
             f"{', '.join(missing_groups)}"
         )
 
     try:
         for group in missing_groups:
-            Logger.print_status(f"Adding user '{CURRENT_USER}' to group {group} ...")
-            command = ["sudo", "usermod", "-a", "-G", group, CURRENT_USER]
+            Logger.print_status(f"Adding user '{current_user}' to group {group} ...")
+            command = ["sudo", "usermod", "-a", "-G", group, current_user]
             run(command, check=True)
-            Logger.print_ok(f"Group {group} assigned to user '{CURRENT_USER}'.")
+            Logger.print_ok(f"Group {group} assigned to user '{current_user}'.")
     except CalledProcessError as e:
         Logger.print_error(f"Unable to add user to usergroups: {e}")
         raise

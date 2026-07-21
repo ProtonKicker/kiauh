@@ -13,7 +13,6 @@ from pathlib import Path
 from textwrap import dedent
 
 from components.klipper.klipper import Klipper
-from core.constants import CURRENT_USER
 from core.instance_manager.base_instance import BaseInstance
 from core.logger import Logger
 from extensions.octoprint import (
@@ -22,7 +21,11 @@ from extensions.octoprint import (
     OP_LOG_NAME,
 )
 from utils.fs_utils import create_folders
-from utils.sys_utils import create_service_file, get_service_file_path
+from utils.sys_utils import (
+    create_service_file,
+    get_current_user,
+    get_service_file_path,
+)
 
 
 @dataclass
@@ -88,7 +91,7 @@ class Octoprint:
             Environment="LC_ALL=C.UTF-8"
             Environment="LANG=C.UTF-8"
             Type=simple
-            User={CURRENT_USER}
+            User={get_current_user()}
             ExecStart={octo_exec} --basedir {basedir} --config {cfg} --port={port} serve
 
             [Install]

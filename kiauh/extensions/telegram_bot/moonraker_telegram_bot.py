@@ -13,7 +13,6 @@ from pathlib import Path
 from subprocess import CalledProcessError
 
 from components.moonraker.moonraker import Moonraker
-from core.constants import CURRENT_USER
 from core.instance_manager.base_instance import BaseInstance
 from core.logger import Logger
 from extensions.telegram_bot import (
@@ -26,7 +25,7 @@ from extensions.telegram_bot import (
     TG_BOT_SERVICE_TEMPLATE,
 )
 from utils.fs_utils import create_folders
-from utils.sys_utils import get_service_file_path
+from utils.sys_utils import get_current_user, get_service_file_path
 
 
 # noinspection PyMethodMayBeStatic
@@ -86,7 +85,7 @@ class MoonrakerTelegramBot:
 
         service_content = template_content.replace(
             "%USER%",
-            CURRENT_USER,
+            get_current_user(),
         )
         service_content = service_content.replace(
             "%TELEGRAM_BOT_DIR%",

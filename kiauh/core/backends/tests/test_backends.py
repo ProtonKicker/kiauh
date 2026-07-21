@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -13,12 +14,14 @@ from utils import fs_utils, sys_utils
 class TestSubprocessRunner:
     def test_run_executes_command(self) -> None:
         runner = SubprocessRunner()
-        result = runner.run(["true"])
+        result = runner.run([sys.executable, "-c", ""])
         assert result.returncode == 0
 
     def test_check_output_returns_stdout(self) -> None:
         runner = SubprocessRunner()
-        output = runner.check_output(["echo", "hello"], text=True)
+        output = runner.check_output(
+            [sys.executable, "-c", "print('hello')"], text=True
+        )
         assert "hello" in output
 
 
