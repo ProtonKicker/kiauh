@@ -13,7 +13,7 @@ from __future__ import annotations
 import shutil
 import subprocess
 from pathlib import Path
-from typing import Any, List, Protocol, Sequence, cast, runtime_checkable
+from typing import Any, Protocol, Sequence, cast
 
 # --------------------------------------------------------------------------- #
 # Singleton backends                                                          #
@@ -27,27 +27,6 @@ from typing import Any, List, Protocol, Sequence, cast, runtime_checkable
 # per-module duplicates
 
 
-def run(cmd: str | List[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
-    """Run a command through the shared command runner."""
-    return command_runner.run(cmd, **kwargs)
-
-
-def check_output(cmd: str | List[str], **kwargs: Any) -> str | bytes:
-    """Run a command and return its output through the shared command runner."""
-    return command_runner.check_output(cmd, **kwargs)
-
-
-def call(cmd: str | List[str], **kwargs: Any) -> int:
-    """Run a command and return its exit code through the shared command runner."""
-    return command_runner.call(cmd, **kwargs)
-
-
-def popen(cmd: str | List[str], **kwargs: Any) -> subprocess.Popen:
-    """Start a process through the shared command runner."""
-    return command_runner.popen(cmd, **kwargs)
-
-
-@runtime_checkable
 class CommandRunner(Protocol):
     """Pluggable backend for executing system commands."""
 
@@ -108,7 +87,6 @@ class SubprocessRunner:
         return subprocess.Popen(cmd, **kwargs)
 
 
-@runtime_checkable
 class FilesystemBackend(Protocol):
     """Pluggable backend for filesystem operations."""
 
