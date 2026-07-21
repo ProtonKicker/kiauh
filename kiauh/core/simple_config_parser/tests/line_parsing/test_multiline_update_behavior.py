@@ -1,6 +1,11 @@
 # ======================================================================= #
-#  Tests: Verhalten beim Aktualisieren von Multiline-Optionen            #
+#  Copyright (C) 2024 Dominik Willner <dev.dw-0@proton.me>                #
+#                                                                         #
+#  https://github.com/dw-0/simple-config-parser                           #
+#                                                                         #
+#  This file may be distributed under the terms of the GNU GPLv3 license  #
 # ======================================================================= #
+
 from pathlib import Path
 
 from core.simple_config_parser.simple_config_parser import (

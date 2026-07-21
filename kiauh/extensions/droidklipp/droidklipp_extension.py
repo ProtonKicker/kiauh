@@ -6,6 +6,7 @@
 #                                                                         #
 #  This file may be distributed under the terms of the GNU GPLv3 license  #
 # ======================================================================= #
+
 from subprocess import CalledProcessError, run
 
 from components.klipperscreen import KLIPPERSCREEN_DIR, KLIPPERSCREEN_ENV_DIR

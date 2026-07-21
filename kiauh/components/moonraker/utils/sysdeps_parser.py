@@ -1,9 +1,9 @@
 # ======================================================================= #
-#  Copyright (C) 2020 - 2026 Dominik Willner <th33xitus@gmail.com>        #
+#  Copyright (C) 2020 - 2026 Dominik Willner <dev.dw-0@proton.me>         #
 #                                                                         #
 #  This file is part of KIAUH - Klipper Installation And Update Helper    #
 #  https://github.com/dw-0/kiauh                                          #
-#  It was modified by Dominik Willner <th33xitus@gmail.com>               #
+#  It was modified by Dominik Willner <dev.dw-0@proton.me>                #
 #                                                                         #
 #  The original file is part of Moonraker:                                #
 #  https://github.com/Arksine/moonraker                                   #

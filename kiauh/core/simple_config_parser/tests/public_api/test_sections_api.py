@@ -1,5 +1,5 @@
 # ======================================================================= #
-#  Copyright (C) 2024 Dominik Willner <th33xitus@gmail.com>               #
+#  Copyright (C) 2024 Dominik Willner <dev.dw-0@proton.me>                #
 #                                                                         #
 #  https://github.com/dw-0/simple-config-parser                           #
 #                                                                         #
