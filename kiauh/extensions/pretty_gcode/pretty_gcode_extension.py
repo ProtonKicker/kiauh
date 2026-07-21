@@ -16,7 +16,7 @@ from core.logger import DialogType, Logger
 from extensions.base_extension import BaseExtension
 from utils.common import check_install_dependencies
 from utils.fs_utils import (
-    remove_file,
+    remove_with_sudo,
 )
 from utils.git_utils import git_clone_wrapper, git_pull_wrapper
 from utils.input_utils import get_number_input
@@ -91,8 +91,12 @@ class PrettyGcodeExtension(BaseExtension):
             # remove pgc dir
             shutil.rmtree(PGC_DIR)
             # remove nginx config
-            remove_file(NGINX_SITES_AVAILABLE.joinpath(PGC_CONF), True)
-            remove_file(NGINX_SITES_ENABLED.joinpath(PGC_CONF), True)
+            remove_with_sudo(
+                [
+                    NGINX_SITES_AVAILABLE.joinpath(PGC_CONF),
+                    NGINX_SITES_ENABLED.joinpath(PGC_CONF),
+                ]
+            )
             # restart nginx
             cmd_sysctl_service("nginx", "restart")
 

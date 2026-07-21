@@ -24,7 +24,7 @@ from extensions.telegram_bot.moonraker_telegram_bot import (
 )
 from utils.common import check_install_dependencies
 from utils.config_utils import add_config_section, remove_config_section
-from utils.fs_utils import remove_file
+from utils.fs_utils import remove_with_sudo
 from utils.git_utils import git_clone_wrapper, git_pull_wrapper
 from utils.input_utils import get_confirm
 from utils.instance_utils import get_instances
@@ -227,4 +227,4 @@ class TelegramBotExtension(BaseExtension):
 
         for log in all_logfiles:
             Logger.print_status(f"Remove '{log}'")
-            remove_file(log)
+            remove_with_sudo(log)

@@ -41,7 +41,7 @@ from core.simple_config_parser.simple_config_parser import (
 from core.types.color import Color
 from core.types.component_status import ComponentStatus
 from utils.common import get_install_status
-from utils.fs_utils import create_symlink, remove_file
+from utils.fs_utils import create_symlink, remove_with_sudo
 from utils.git_utils import (
     get_latest_remote_tag,
     get_latest_unstable_tag,
@@ -353,7 +353,7 @@ def create_nginx_cfg(
 
         source = NGINX_SITES_AVAILABLE.joinpath(cfg_name)
         target = NGINX_SITES_ENABLED.joinpath(cfg_name)
-        remove_file(Path("/etc/nginx/sites-enabled/default"), True)
+        remove_with_sudo(Path("/etc/nginx/sites-enabled/default"))
         generate_nginx_cfg_from_template(cfg_name, template_src=template_src, **kwargs)
         create_symlink(source, target, True)
         set_nginx_permissions()

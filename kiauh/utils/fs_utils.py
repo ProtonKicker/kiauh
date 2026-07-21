@@ -20,7 +20,6 @@ from typing import List
 from zipfile import ZipFile
 
 from core import backends
-from core.decorators import deprecated
 from core.logger import Logger
 
 # Delegate to the shared backends module so tests can substitute
@@ -108,17 +107,6 @@ def remove_with_sudo(files: Path | List[Path]) -> bool:
             Logger.print_error(f"Error removing file '{f}': {e}")
 
     return len(_removed) > 0
-
-
-@deprecated(info="Use remove_with_sudo instead", replaced_by=remove_with_sudo)
-def remove_file(file_path: Path, sudo=False) -> None:
-    try:
-        cmd = f"{'sudo ' if sudo else ''}rm -f {file_path}"
-        run(cmd, stderr=PIPE, check=True, shell=True)
-    except CalledProcessError as e:
-        log = f"Cannot remove file {file_path}: {e.stderr.decode()}"
-        Logger.print_error(log)
-        raise
 
 
 def run_remove_routines(file: Path) -> bool:

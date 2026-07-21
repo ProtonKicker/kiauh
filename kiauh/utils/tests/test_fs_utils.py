@@ -20,7 +20,6 @@ from utils.fs_utils import (
     create_folders,
     create_symlink,
     get_data_dir,
-    remove_file,
     remove_with_sudo,
     run_remove_routines,
     unzip,
@@ -145,22 +144,6 @@ class TestRemoveWithSudo:
             ["sudo", "rm", "-rf", "/a"],
             ["sudo", "rm", "-rf", "/b"],
         ]
-
-
-class TestRemoveFile:
-    def test_calls_shell_rm(self, monkeypatch) -> None:
-        runs: List[Any] = []
-
-        def fake_run(cmd: str, **kwargs: Any) -> Any:
-            runs.append((cmd, kwargs.get("shell")))
-            return None
-
-        monkeypatch.setattr("utils.fs_utils.run", fake_run)
-
-        with pytest.warns(DeprecationWarning):
-            remove_file(Path("/some/file"), sudo=True)
-
-        assert runs == [(f"sudo rm -f {Path('/some/file')}", True)]
 
 
 class TestRunRemoveRoutines:
